@@ -121,4 +121,86 @@ class Pimple implements ArrayAccess
             return $callable;
         };
     }
+    
+
+  /**
+   * Make any values safe for seralisation
+   * @author Sami at patabugen.co.uk
+   */
+  function __sleep()
+  {
+  	foreach ($this as &$value) {
+  		if (is_callable($value)){
+  			$value = $this->_serializeClosure($value);
+  		}else{
+			throw new Exception(print_r($value, true));  			
+  		}
+  	}
+  	return array('values');
+  }
+  
+  /**
+   * Make restore any serialised values
+   * @author Sami at patabugen.co.uk
+   */
+  function __wake()
+  {
+  	foreach ($this as &$value) {
+  		if ($this->_isSerialized($value)){
+  			$value = $this->_unserializeClosure($value);
+  		}
+  	}
+  	return array('values');
+  }
+  
+  /**
+   * @param $str
+   * @author chris AT cmbuckley DOT co DOT uk from PHP Docs
+   */
+  function _isSerialized($str) {
+     return ($str == serialize(false) || @unserialize($str) !== false);
+  }
+
+  /**
+   * 
+   * @param $closure
+   * @author     Jeremy Lindblom <http://webdevilaz.com>
+   */
+  function _serializeClosure($closure)
+  {
+  	$reflected = new ReflectionFunction($closure);
+	if ( ! $reflected->isClosure())
+		throw new RuntimeException();
+	
+	// Get the code
+	$file = new SplFileObject($reflected->getFileName());
+	$file->seek($reflected->getStartLine() - 1);
+	$code = '';
+	while ($file->key() < $reflected->getEndLine())
+	{
+		$code .= $file->current();
+		$file->next();
+	}
+	$begin = strpos($code, 'function');
+	$end   = strrpos($code, '}');
+	$code  = substr($code, $begin, $end - $begin + 1);
+	$context = $reflected->getStaticVariables();
+	return serialize(array($code, $context));
+  }
+  
+  /**
+   * 
+   * @param $closure
+   * @author     Jeremy Lindblom <http://webdevilaz.com>
+   */
+  
+  function _unserializeClosure($serialized)
+  {
+	list($code, $context) = unserialize($serialized);
+	extract($context);
+	@eval("\$_closure = $code;");
+	if ( ! isset($_closure) OR ! is_callable($_closure))
+		throw new RuntimeException();
+	return $_closure;
+  }
 }

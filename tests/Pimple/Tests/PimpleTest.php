@@ -134,4 +134,16 @@ class PimpleTest extends \PHPUnit_Framework_TestCase
 
         $this->assertSame($callback, $pimple['protected']);
     }
+    
+    public function testSerializingWithClosure()
+    {
+        $pimple = new Pimple();
+        $pimple['service'] = function() {
+            return new Service();
+        };
+		$serialized = serialize($pimple);
+		$pimple = unserialize($serialized);
+		
+        $this->assertInstanceOf('Pimple\Tests\Service', $pimple['service']);
+    }
 }
